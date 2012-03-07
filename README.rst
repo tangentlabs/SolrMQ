@@ -13,17 +13,20 @@ Sample SolrConfig config:::
            <str name="queue">solrmq</str>
 	   <str name="updateHandlerName">/update</str>
 	</requestHandler>
+	
+You will need to put the ./bin/plugin-solr-mq.jar and the ./lib/rabbitmq-client.jar 
+into the solr lib directory, or load it via the solrconfig.xml.
 
-Note: the plugin should be loaded non-lazily.
+Note: the plugin should not be loaded lazily, and neither should the update handler.
 
 At the moment it is a fire-and-forget standard queue. 
 We will add in other queue mechanisms shortly, and add in error
 handeling, such as logging, and error queues.
 
 Shameless Company Plug:
+======================
 I wrote this while at Tangent-Snowball, as part of Labs, tangential to a project.
 I was given permission to build this and open this.
 http://www.tangentlabs.co.uk/
  
-Thanks Guys.
 
