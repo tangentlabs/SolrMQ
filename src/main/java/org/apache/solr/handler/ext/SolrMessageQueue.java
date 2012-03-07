@@ -88,7 +88,7 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 	 * @param handler - name of the handler, like /update or /update/json. Should probably be loaded.
 	 * @param params - the parameters, these can be parsed as custom message headers
 	 * @param message - the actual message, at present only strings are allowed.
-	 * @return
+	 * @return SolrQueryResponse - returns the actiual response. Check the Exception to handle faults
 	 */
 	public SolrQueryResponse performUpdateRequest(String handler, Map<String, String[]> params, String message){
 		
@@ -107,11 +107,21 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 		return response;
 	}
 
-
+	/**
+	 * This gives us a handle to the SolrCore
+	 *  @param core - the SolrCore
+	 */
 	public void inform(SolrCore core) {
 		this.core = core;
 	}
 
+	/**
+	 * Listener thread. This is the core listener.
+	 * Any message consumed spawns a new thread for handelling. 
+	 *
+	 * @author rnoble
+	 *
+	 */
 	private class QueueListener extends Thread{
 		public void run() {
 			Connection connection;
@@ -143,6 +153,11 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 		}
 	}
 
+	/**
+	 * Worker thread. This is spawned for exach message consumed.
+	 * @author rnoble
+	 *
+	 */
 	private class QueueUpdateWorker extends Thread{
 		QueueingConsumer.Delivery delivery;
 		public QueueUpdateWorker(QueueingConsumer.Delivery delivery){
@@ -157,6 +172,10 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 			//also allow for failures.
 		}
 		
+		/**
+		 * Extract the parameters from the custom headers, if any have been added.
+		 * @return
+		 */
 		private Map<String, String[]> getParams(){
 			Map<String,Object> headers = delivery.getProperties().getHeaders();
 			
