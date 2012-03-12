@@ -1,5 +1,6 @@
 package org.apache.solr.handler.ext.worker;
 
+import org.apache.solr.handler.ext.exceptions.UpdateFailedException;
 import org.apache.solr.handler.utils.ISolrCoreWrapper;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
@@ -18,6 +19,13 @@ public class CallbackWorker extends QueueUpdateWorker{
 	protected void handleResult(SolrQueryRequest request,
 			SolrQueryResponse result) {
 		//delivery.
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	protected void handleError(UpdateFailedException e,
+			SolrQueryRequest request, SolrQueryResponse response) {
 		// TODO Auto-generated method stub
 		
 	}

@@ -10,6 +10,7 @@ import org.apache.solr.common.params.MultiMapSolrParams;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.core.SolrCore;
+import org.apache.solr.handler.ext.exceptions.UpdateFailedException;
 import org.apache.solr.handler.utils.ISolrCoreWrapper;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryRequestBase;
@@ -55,12 +56,20 @@ public abstract class QueueUpdateWorker extends Thread {
 		SolrQueryRequest request = getRequest(getParams(), message);
 		SolrQueryResponse response = getInitialResponse();
 		performUpdateRequest(updateHandler, request, response);
-		handleResult(request, response);
+		try {
+			handleResult(request, response);
+		} catch (UpdateFailedException e) {
+			handleError(e, request, response);
+		}
+		
 	}
 
 	
+	protected abstract void handleError(UpdateFailedException e, SolrQueryRequest request,
+			SolrQueryResponse response);
+
 	protected abstract void handleResult(SolrQueryRequest request,
-			SolrQueryResponse result);
+			SolrQueryResponse result) throws UpdateFailedException;
 
 	/**
 	 * 
@@ -74,7 +83,6 @@ public abstract class QueueUpdateWorker extends Thread {
 	public SolrQueryResponse performUpdateRequest(String handler, SolrQueryRequest request,
 			SolrQueryResponse response) {
 		core.executeSolrUpdateRequest(handler, request, response);
-		handleResult(request, response);
 		return response;
 	}
 
