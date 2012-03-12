@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.solr.common.params.MultiMapSolrParams;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
@@ -15,6 +16,7 @@ import org.apache.solr.request.SolrQueryRequestBase;
 import org.apache.solr.request.SolrRequestHandler;
 import org.apache.solr.response.SolrQueryResponse;
 
+import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.QueueingConsumer;
 import com.rabbitmq.client.QueueingConsumer.Delivery;
 
@@ -28,17 +30,18 @@ public abstract class QueueUpdateWorker extends Thread {
 	QueueingConsumer.Delivery delivery;
 	protected String updateHandler;
 	protected ISolrCoreWrapper core;
-
+	protected Channel channel;
 	/**
 	 * Worker thread for the update
 	 * @param core
 	 * @param updateHandler
 	 * @param delivery
 	 */
-	public QueueUpdateWorker(ISolrCoreWrapper core, String updateHandler,
+	public QueueUpdateWorker(ISolrCoreWrapper core, Channel channel, String updateHandler,
 			QueueingConsumer.Delivery delivery) {
 		super();
 		this.core = core;
+		this.channel = channel;
 		this.updateHandler = updateHandler;
 		this.delivery = delivery;
 	}
@@ -70,7 +73,6 @@ public abstract class QueueUpdateWorker extends Thread {
 	 */
 	public SolrQueryResponse performUpdateRequest(String handler, SolrQueryRequest request,
 			SolrQueryResponse response) {
-		
 		core.executeSolrUpdateRequest(handler, request, response);
 		handleResult(request, response);
 		return response;
@@ -131,6 +133,16 @@ public abstract class QueueUpdateWorker extends Thread {
 	}
 	
 	
-	
+	public static QueueUpdateWorker getUpdateWorker(QueueListenerThread listener, ISolrCoreWrapper core, Channel channel, String updateHandler,
+			QueueingConsumer.Delivery delivery){
+		if (listener.getErrorQueue() == null){
+			ErrorQueueingWorker worker = new ErrorQueueingWorker(core, channel, updateHandler, delivery);
+			return worker;
+		} else {
+			return new CallbackWorker(core, channel, updateHandler, delivery);
+		}
+		
+		
+	}
 
 }

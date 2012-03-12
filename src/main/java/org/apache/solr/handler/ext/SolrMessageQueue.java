@@ -19,6 +19,7 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 	protected String mqHost;
 	protected ConnectionFactory factory;
 	protected String queue;
+	protected String errorQueue;
 	protected String plugin_handler;
 	protected Boolean durable = Boolean.TRUE;
 	protected ISolrCoreWrapper coreWrapper;
@@ -32,12 +33,14 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 		super.init(args);
 		mqHost = (String) this.initArgs.get("messageQueueHost");
 		queue = (String) this.initArgs.get("queue");
+		errorQueue = (String) this.initArgs.get("errorQueue");
 		plugin_handler = (String) this.initArgs.get("updateHandlerName");
 		factory = new ConnectionFactory();
 	    factory.setHost(mqHost);
 	    
 	    QueueListenerThread listener = new QueueListenerThread(coreWrapper, factory, plugin_handler, queue);
 	    listener.setDurable(durable);
+	    
 	    listener.start();
 	    
 	}

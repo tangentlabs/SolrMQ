@@ -8,9 +8,7 @@ import org.apache.solr.response.SolrQueryResponse;
 public class SolrCoreWrapper implements ISolrCoreWrapper{
 	SolrCore core;
 	
-	public SolrCoreWrapper(){
-		
-	}
+	public SolrCoreWrapper(){}
 	
 	public SolrCoreWrapper(SolrCore core){
 		this.core = core;

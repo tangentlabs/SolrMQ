@@ -25,6 +25,9 @@ public class QueueListenerThread extends Thread{
 	protected ConnectionFactory factory;
 	protected String handler;
 	protected String queue;
+	protected String errorQueue;
+	
+
 	protected ISolrCoreWrapper core;
 	protected Boolean durable;
 	
@@ -34,6 +37,8 @@ public class QueueListenerThread extends Thread{
 		this.handler = handler;
 		this.queue = queue;
 		this.durable = Boolean.FALSE;
+		this.errorQueue = null;
+		
 	}
 	
 	public void run() {
@@ -47,16 +52,8 @@ public class QueueListenerThread extends Thread{
 		    
 		    while (true) {
 		      QueueingConsumer.Delivery delivery = consumer.nextDelivery();
-		      QueueUpdateWorker worker = new QueueUpdateWorker(core, handler, delivery){
+		      QueueUpdateWorker worker = QueueUpdateWorker.getUpdateWorker(this, core, channel, handler, delivery);
 
-				@Override
-				protected void handleResult(SolrQueryRequest request,
-						SolrQueryResponse result) {
-					// TODO Auto-generated method stub
-					
-				}
-		    	  
-		      };
 		      worker.start();
 		    }
 		} catch (IOException e) {
@@ -80,5 +77,12 @@ public class QueueListenerThread extends Thread{
 
 	public void setDurable(Boolean durable) {
 		this.durable = durable;
+	}
+	public String getErrorQueue() {
+		return errorQueue;
+	}
+
+	public void setErrorQueue(String errorQueue) {
+		this.errorQueue = errorQueue;
 	}
 }
