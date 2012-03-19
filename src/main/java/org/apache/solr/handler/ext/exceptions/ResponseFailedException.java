@@ -1,22 +1,22 @@
 package org.apache.solr.handler.ext.exceptions;
 
-public class UpdateFailedException extends SolrMqException {
+public class ResponseFailedException extends SolrMqException {
 
-	public UpdateFailedException() {
+	public ResponseFailedException() {
 		// TODO Auto-generated constructor stub
 	}
 
-	public UpdateFailedException(String arg0) {
+	public ResponseFailedException(String arg0) {
 		super(arg0);
 		// TODO Auto-generated constructor stub
 	}
 
-	public UpdateFailedException(Throwable arg0) {
+	public ResponseFailedException(Throwable arg0) {
 		super(arg0);
 		// TODO Auto-generated constructor stub
 	}
 
-	public UpdateFailedException(String arg0, Throwable arg1) {
+	public ResponseFailedException(String arg0, Throwable arg1) {
 		super(arg0, arg1);
 		// TODO Auto-generated constructor stub
 	}
