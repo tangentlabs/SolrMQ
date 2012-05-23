@@ -31,18 +31,21 @@ public class DefaultWorker extends QueueUpdateWorker{
 		if ((delivery.getProperties().getReplyTo() != null) && (delivery.getProperties().getCorrelationId() != null)){
 			String values = result.getValues().toString();
 			try {
+				System.out.println("Responding");
 				sendResponse(channel, delivery.getProperties().getReplyTo(), values);
 			} catch (IOException e) {
 				throw new ResponseFailedException(e);
 			}
 		}
 		
-		try {
-			channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+//		try {
+//			System.out.println("Basic Ack");
+//			//channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+//			System.out.println("Basic Ack Sent");
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
 		
 	}
 

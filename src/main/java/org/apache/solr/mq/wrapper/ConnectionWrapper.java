@@ -2,6 +2,8 @@ package org.apache.solr.mq.wrapper;
 
 import java.io.IOException;
 
+import org.apache.solr.response.SolrQueryResponse;
+
 import com.rabbitmq.client.Connection;
 
 public class ConnectionWrapper implements IConnectionWrapper {
@@ -13,5 +15,24 @@ public class ConnectionWrapper implements IConnectionWrapper {
 		// TODO Auto-generated method stub
 		return new ChannelWrapper(connection.createChannel());
 	}
+	public String getStatus() {
+		// TODO Auto-generated method stub
+		if (connection.getCloseReason() == null){
+			return null;
+		}
+		return connection.getCloseReason().getMessage();
+	}
+	
+	
+	public String stopConnection(){
+		try {
+			connection.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			connection.abort();
+		}
+		return "Connection Closed";
+	}
+	
 
 }

@@ -26,6 +26,9 @@ import com.rabbitmq.client.ShutdownSignalException;
  *
  */
 public class QueueListenerThread extends Thread{
+	public final int STOPPED = 0;
+	public final int RUNNING = 1;
+	protected int mode = RUNNING;
 	protected IConnectionFactoryWrapper factory;
 	protected String handler;
 	protected String queue;
@@ -34,6 +37,9 @@ public class QueueListenerThread extends Thread{
 
 	protected ISolrCoreWrapper core;
 	protected Boolean durable;
+	private IConnectionWrapper connection;
+	private IChannelWrapper channel;
+	private Exception error;
 	
 	public QueueListenerThread(ISolrCoreWrapper coreWrapper, IConnectionFactoryWrapper factory, String handler, String queue){
 		this.core = coreWrapper;
@@ -42,37 +48,39 @@ public class QueueListenerThread extends Thread{
 		this.queue = queue;
 		this.durable = Boolean.FALSE;
 		this.errorQueue = null;
-		
+		this.mode = RUNNING;
 	}
 	
 	public void run() {
-		IConnectionWrapper connection;
-		try {
-			connection = factory.newConnection();
-			IChannelWrapper channel = connection.createChannel();
-		    channel.queueDeclare(queue, durable.booleanValue(), false, false, null);
-		    channel.initialiseConsumer(queue);
-		    
-		    while (true) {
-		      QueueingConsumer.Delivery delivery = channel.getNextDelivery();
-		      QueueUpdateWorker worker = QueueUpdateWorker.getUpdateWorker(this, workerSettings, core, channel, handler, delivery);
-		      String errorQueue = workerSettings.get("errorQueue");
-		      if (errorQueue != null && !errorQueue.isEmpty()){
-		    	  worker.setErrorChannel(buildErrorQueue(errorQueue));
-		      }
-		      worker.start();
-		    }
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (ShutdownSignalException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ConsumerCancelledException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		for (;;){
+			try {
+				connection = factory.newConnection();
+				channel = connection.createChannel();
+			    channel.queueDeclare(queue, durable.booleanValue(), false, false, null);
+			    channel.initialiseConsumer(queue);
+			    
+			    while (true) {
+			      QueueingConsumer.Delivery delivery = channel.getNextDelivery();
+			      QueueUpdateWorker worker = QueueUpdateWorker.getUpdateWorker(this, workerSettings, core, channel, handler, delivery);
+			      String errorQueue = workerSettings.get("errorQueue");
+			      if (errorQueue != null && !errorQueue.isEmpty()){
+			    	  worker.setErrorChannel(buildErrorQueue(errorQueue));
+			      }
+			      worker.run();
+	//		      worker.start();
+			    }
+			} catch (Exception e) {
+				error = e;
+			}
+			if (mode == STOPPED){
+				break;
+			}
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 		
 	}
@@ -105,5 +113,43 @@ public class QueueListenerThread extends Thread{
 
 	public NamedList<String> getWorkerSettings() {
 		return workerSettings;
+	}
+
+	public IConnectionWrapper getConnection() {
+		return connection;
+	}
+
+	public void setConnection(IConnectionWrapper connection) {
+		this.connection = connection;
+	}
+
+	public void requestStop() {
+		
+		channel.cancelConsumer();
+		connection.stopConnection();
+	}
+	
+	public void purgeQueue() throws IOException {
+		channel.purgeQueue();
+	}
+	
+	public void deleteQueue() throws IOException {
+		channel.deleteQueue();
+	}
+
+	public Exception getError() {
+		return error;
+	}
+
+	public void setError(Exception error) {
+		this.error = error;
+	}
+
+	public int getMode() {
+		return mode;
+	}
+
+	public void setMode(int mode) {
+		this.mode = mode;
 	}
 }

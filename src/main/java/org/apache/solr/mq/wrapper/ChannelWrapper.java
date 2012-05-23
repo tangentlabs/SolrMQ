@@ -1,6 +1,7 @@
 package org.apache.solr.mq.wrapper;
 
 import java.io.IOException;
+import java.util.Map;
 
 import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.Channel;
@@ -12,20 +13,20 @@ import com.rabbitmq.client.ShutdownSignalException;
 public class ChannelWrapper implements IChannelWrapper {
 	Channel channel;
 	QueueingConsumer consumer;
-	
+	String queue;
 	
 	public ChannelWrapper(Channel channel) {
 		this.channel = channel;
 	}
 
 	public void queueDeclare(String queue, boolean booleanValue, boolean b,
-			boolean c, Object object) {
-		// TODO Auto-generated method stub
-
+			boolean c, Map<String,Object> object) throws IOException {
+		this.queue = queue;
+		this.channel.queueDeclare(queue, booleanValue, b, c, object);
+		
 	}
 
 	public void basicConsume(String queue, boolean b, QueueingConsumer consumer) {
-		// TODO Auto-generated method stub
 
 	}
 
@@ -34,6 +35,15 @@ public class ChannelWrapper implements IChannelWrapper {
 		// TODO Auto-generated method stub
 		
 	}
+	
+	public void cancelConsumer(){
+		try {
+			consumer.handleCancel(consumer.getConsumerTag());
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 
 	public void initialiseConsumer(String queue) throws IOException {
 		consumer = new QueueingConsumer(channel);
@@ -41,12 +51,26 @@ public class ChannelWrapper implements IChannelWrapper {
 	}
 
 	public Delivery getNextDelivery() throws ShutdownSignalException, ConsumerCancelledException, InterruptedException {
-		
-		return consumer.nextDelivery();
+		try {
+			return consumer.nextDelivery();
+		} catch (ShutdownSignalException sse){
+			sse.getReference();
+			throw sse;
+		}
 	}
 
 	public void basicAck(long deliveryTag, boolean b) throws IOException {
 		channel.basicAck(deliveryTag, b);
+		
+	}
+
+	public void purgeQueue() throws IOException {
+		channel.queuePurge(queue);
+		
+	}
+
+	public void deleteQueue() throws IOException {
+		channel.queueDelete(queue);
 		
 	}
 
