@@ -6,7 +6,9 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.RequestHandlerBase;
 import org.apache.solr.handler.ext.worker.QueueListenerThread;
+import org.apache.solr.handler.ext.worker.UpdateWorkerFactory;
 import org.apache.solr.mq.wrapper.ConnectionFactoryWrapper;
+import org.apache.solr.mq.wrapper.IConnectionFactoryWrapper;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.solrcore.wrapper.ISolrCoreWrapper;
@@ -19,7 +21,7 @@ import com.rabbitmq.client.ConnectionFactory;
 public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAware {
 
 	protected String mqHost;
-	protected ConnectionFactory factory;
+	protected IConnectionFactoryWrapper factoryWrapper;
 	protected String queue;
 	protected String errorQueue;
 	protected String plugin_handler;
@@ -27,30 +29,34 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 	protected ISolrCoreWrapper coreWrapper;
 	protected NamedList<String> workerSettings;
 	private QueueListenerThread listener;
+	private UpdateWorkerFactory updateWorkerFactory;
 	
 	public SolrMessageQueue() {}
 	
 	
 	
+	@SuppressWarnings("unchecked")
 	@Override
-	public void init(NamedList args) {
+	public void init(@SuppressWarnings("rawtypes") NamedList args) {
 		super.init(args);
 		mqHost = (String) this.initArgs.get("messageQueueHost");
 		queue = (String) this.initArgs.get("queue");
 		errorQueue = (String) this.initArgs.get("errorQueue");
 		plugin_handler = (String) this.initArgs.get("updateHandlerName");
 		workerSettings = (NamedList<String>) this.initArgs.get("workerSettings");
-		coreWrapper = new SolrCoreWrapper();
+		if (coreWrapper == null) coreWrapper = new SolrCoreWrapper();
 		if (workerSettings == null) workerSettings = new NamedList<String>();
-		factory = new ConnectionFactory();
-	    factory.setHost(mqHost);
+		if (factoryWrapper == null){
+			factoryWrapper = new ConnectionFactoryWrapper(new ConnectionFactory());
+		}
+		factoryWrapper.setHost(mqHost);
 	    
 	    createListener();
 	    
 	}
 	
 	public void createListener(){
-		listener = new QueueListenerThread(coreWrapper, new ConnectionFactoryWrapper(factory), plugin_handler, queue);
+		listener = new QueueListenerThread(coreWrapper, factoryWrapper, updateWorkerFactory, plugin_handler, queue);
 	    listener.setDurable(durable);
 	    listener.setWorkerSettings(workerSettings);
 	    listener.start();
@@ -76,6 +82,7 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 		return "$Revision$";
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws IOException  {
 		String status = null;
@@ -92,6 +99,8 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 		rsp.add("host", mqHost);
 		rsp.add("queue", queue);
 		rsp.add("handler", plugin_handler);
+		
+		@SuppressWarnings("rawtypes")
 		NamedList tasks = new NamedList();
 		tasks.add("stop", "<a href='#?task=stop'>Stop Consumer</a>");
 		tasks.add("start", "<a href='#?task=start'>Start Consumer</a>");
@@ -158,6 +167,30 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 
 	public void setCoreWrapper(ISolrCoreWrapper coreWrapper) {
 		this.coreWrapper = coreWrapper;
+	}
+
+
+
+	public IConnectionFactoryWrapper getFactoryWrapper() {
+		return factoryWrapper;
+	}
+
+
+
+	public void setFactoryWrapper(IConnectionFactoryWrapper factoryWrapper) {
+		this.factoryWrapper = factoryWrapper;
+	}
+
+
+
+	public UpdateWorkerFactory getUpdateWorkerFactory() {
+		return updateWorkerFactory;
+	}
+
+
+
+	public void setUpdateWorkerFactory(UpdateWorkerFactory updateWorkerFactory) {
+		this.updateWorkerFactory = updateWorkerFactory;
 	}
 
 	

@@ -9,9 +9,14 @@ It makes use of the current Solr update plugins and allows you to specify the Qu
 Sample SolrConfig config:::
 
 	<requestHandler name="/mq" class="org.apache.solr.handler.ext.SolrMessageQueue" >
-      	   <str name="messageQueueHost">localhost</str>
-           <str name="queue">solrmq</str>
+       <str name="messageQueueHost">localhost</str>
+       <str name="queue">solrmq</str>
 	   <str name="updateHandlerName">/update</str>
+	   <lst name="workerSettings">
+          <str name="useAuthentication">true</str>
+          <str name="username">user</str>
+          <str name="password">password</str>
+       </lst>
 	</requestHandler>
 	
 You will need to put the ./bin/plugin-solr-mq.jar and the ./lib/rabbitmq-client.jar 

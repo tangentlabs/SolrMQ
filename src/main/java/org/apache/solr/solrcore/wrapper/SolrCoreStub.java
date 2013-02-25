@@ -8,8 +8,7 @@ public class SolrCoreStub implements ISolrCoreWrapper {
 
 	public void executeSolrUpdateRequest(String handler,
 			SolrQueryRequest request, SolrQueryResponse response) {
-		// TODO Auto-generated method stub
-
+		
 	}
 
 	public SolrCore getCore() {
@@ -18,8 +17,6 @@ public class SolrCoreStub implements ISolrCoreWrapper {
 	}
 
 	public void setCore(SolrCore core) {
-		// TODO Auto-generated method stub
-		
 	}
 
 }

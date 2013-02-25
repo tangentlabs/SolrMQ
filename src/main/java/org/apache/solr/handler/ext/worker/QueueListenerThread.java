@@ -2,21 +2,14 @@ package org.apache.solr.handler.ext.worker;
 
 import java.io.IOException;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.solr.common.util.NamedList;
-import org.apache.solr.core.SolrCore;
 import org.apache.solr.mq.wrapper.IChannelWrapper;
 import org.apache.solr.mq.wrapper.IConnectionFactoryWrapper;
 import org.apache.solr.mq.wrapper.IConnectionWrapper;
-import org.apache.solr.request.SolrQueryRequest;
-import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.solrcore.wrapper.ISolrCoreWrapper;
 
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.ConsumerCancelledException;
 import com.rabbitmq.client.QueueingConsumer;
-import com.rabbitmq.client.ShutdownSignalException;
 
 /**
  * Listener thread. This is the core listener.
@@ -40,9 +33,11 @@ public class QueueListenerThread extends Thread{
 	private IConnectionWrapper connection;
 	private IChannelWrapper channel;
 	private Exception error;
+	private UpdateWorkerFactory updateWorkerFactory;
 	
-	public QueueListenerThread(ISolrCoreWrapper coreWrapper, IConnectionFactoryWrapper factory, String handler, String queue){
+	public QueueListenerThread(ISolrCoreWrapper coreWrapper, IConnectionFactoryWrapper factory, UpdateWorkerFactory updateWorkerFactory, String handler, String queue){
 		this.core = coreWrapper;
+		this.updateWorkerFactory = updateWorkerFactory;
 		this.factory = factory;
 		this.handler = handler;
 		this.queue = queue;
@@ -54,14 +49,18 @@ public class QueueListenerThread extends Thread{
 	public void run() {
 		for (;;){
 			try {
+				if ("true".equals(workerSettings.get("useAuthentication")) && !StringUtils.isEmpty(workerSettings.get("username")) && !StringUtils.isEmpty(workerSettings.get("password"))){
+					factory.applyAuthentication(workerSettings.get("username"), workerSettings.get("password"));
+				}
 				connection = factory.newConnection();
 				channel = connection.createChannel();
 			    channel.queueDeclare(queue, durable.booleanValue(), false, false, null);
 			    channel.initialiseConsumer(queue);
 			    
 			    while (true) {
+			      
 			      QueueingConsumer.Delivery delivery = channel.getNextDelivery();
-			      QueueUpdateWorker worker = QueueUpdateWorker.getUpdateWorker(this, workerSettings, core, channel, handler, delivery);
+			      QueueUpdateWorker worker = updateWorkerFactory.getUpdateWorker(this, workerSettings, core, channel, handler, delivery);
 			      String errorQueue = workerSettings.get("errorQueue");
 			      if (errorQueue != null && !errorQueue.isEmpty()){
 			    	  worker.setErrorChannel(buildErrorQueue(errorQueue));
@@ -78,7 +77,6 @@ public class QueueListenerThread extends Thread{
 			try {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}

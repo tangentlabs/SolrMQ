@@ -12,7 +12,6 @@ import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.solrcore.wrapper.ISolrCoreWrapper;
 
 import com.rabbitmq.client.AMQP.BasicProperties;
-import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.QueueingConsumer.Delivery;
 
 public class DefaultWorker extends QueueUpdateWorker{
