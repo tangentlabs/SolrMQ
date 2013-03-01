@@ -47,7 +47,7 @@ public class ChannelWrapper implements IChannelWrapper {
 
 	public void initialiseConsumer(String queue) throws IOException {
 		consumer = new QueueingConsumer(channel);
-		channel.basicConsume(queue, false, consumer);
+		channel.basicConsume(queue, true, consumer);
 	}
 
 	public Delivery getNextDelivery() throws ShutdownSignalException, ConsumerCancelledException, InterruptedException {

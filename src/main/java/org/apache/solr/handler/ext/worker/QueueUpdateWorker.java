@@ -8,6 +8,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+
 import org.apache.solr.common.params.MultiMapSolrParams;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
@@ -36,6 +39,10 @@ public abstract class QueueUpdateWorker extends Thread {
 	protected IChannelWrapper channel;
 	protected NamedList<String> settings;
 	protected IChannelWrapper errorChannel;
+	protected String errorQueue;
+	
+	Logger logger = Logger.getLogger("org.apache.solr.handler.ext.worker.QueueUpdateWorker");
+	
 
 	/**
 	 * Worker thread for the update
@@ -61,23 +68,32 @@ public abstract class QueueUpdateWorker extends Thread {
 	 * Run the update worker. Read from a Delivery and handle the result.
 	 */
 	public void run() {
+		logger.log(Level.ERROR, "handelling Result");
 		String message = new String(delivery.getBody());
 		SolrQueryRequest request = getRequest(getParams(), message);
 		SolrQueryResponse response = getInitialResponse();
-		performUpdateRequest(updateHandler, request, response);
-		try {
-			handleResult(request, response);
-		} catch (UpdateFailedException e) {
-			handleError(e, request, response);
-		} catch (ResponseFailedException e) {
-			// TODO Auto-generated catch block
-			handleError(e, request, response);
+		if (updateHandler.equals("/null")){
+			logger.log(Level.INFO, "SolrMQ NULL Handler ["+delivery.getBody()+"]");
+		}else {
+			performUpdateRequest(updateHandler, request, response);
+			try {
+				handleResult(request, response);
+			} catch (UpdateFailedException e) {
+				logger.log(Level.ERROR, e);
+				handleError(e, request, response);
+			} catch (ResponseFailedException e) {
+				logger.log(Level.ERROR, e);
+				handleError(e, request, response);
+			}
 		}
-		try {
-			channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		if ("manual".equals(this.settings.get("acknowledge"))){
+			logger.log(Level.INFO, "Sending Ack");
+			try {
+				channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+			} catch (IOException e) {
+				logger.log(Level.ERROR, "SolrMQ Listener error: Sending Ack");
+				logger.log(Level.ERROR, e);
+			}
 		}
 	}
 
@@ -174,5 +190,17 @@ public abstract class QueueUpdateWorker extends Thread {
 	public void setErrorChannel(IChannelWrapper iChannelWrapper) {
 		this.errorChannel = iChannelWrapper;
 	}
+
+	public void setErrorQueue(IChannelWrapper errorChannel, String errorQueue) {
+		setErrorChannel(errorChannel);
+		setErrorQueue(errorQueue);
+		
+	}
+
+	public void setErrorQueue(String errorQueue) {
+		this.errorQueue = errorQueue;
+		
+	}
+
 
 }

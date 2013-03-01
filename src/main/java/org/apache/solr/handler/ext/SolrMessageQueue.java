@@ -1,6 +1,8 @@
 package org.apache.solr.handler.ext;
 
 import java.io.IOException;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.core.SolrCore;
@@ -9,6 +11,7 @@ import org.apache.solr.handler.ext.worker.QueueListenerThread;
 import org.apache.solr.handler.ext.worker.UpdateWorkerFactory;
 import org.apache.solr.mq.wrapper.ConnectionFactoryWrapper;
 import org.apache.solr.mq.wrapper.IConnectionFactoryWrapper;
+import org.apache.solr.mq.wrapper.IConnectionWrapper;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.solrcore.wrapper.ISolrCoreWrapper;
@@ -27,12 +30,14 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 	protected String plugin_handler;
 	protected Boolean durable = Boolean.TRUE;
 	protected ISolrCoreWrapper coreWrapper;
-	protected NamedList<String> workerSettings;
-	private QueueListenerThread listener;
-	private UpdateWorkerFactory updateWorkerFactory;
+	protected NamedList workerSettings;
+	protected NamedList errorSettings;
+	protected QueueListenerThread listener;
+	protected UpdateWorkerFactory updateWorkerFactory;
 	
 	public SolrMessageQueue() {}
 	
+	Logger logger = Logger.getLogger("org.apache.solr.handler.ext.SolrMessageQueue");
 	
 	
 	@SuppressWarnings("unchecked")
@@ -41,25 +46,30 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 		super.init(args);
 		mqHost = (String) this.initArgs.get("messageQueueHost");
 		queue = (String) this.initArgs.get("queue");
-		errorQueue = (String) this.initArgs.get("errorQueue");
 		plugin_handler = (String) this.initArgs.get("updateHandlerName");
-		workerSettings = (NamedList<String>) this.initArgs.get("workerSettings");
+		workerSettings = (NamedList) this.initArgs.get("workerSettings");
+		errorSettings = (NamedList) this.initArgs.get("errorQueue");
 		if (coreWrapper == null) coreWrapper = new SolrCoreWrapper();
-		if (workerSettings == null) workerSettings = new NamedList<String>();
+		if (workerSettings == null) workerSettings = new NamedList();
 		if (factoryWrapper == null){
 			factoryWrapper = new ConnectionFactoryWrapper(new ConnectionFactory());
 		}
 		factoryWrapper.setHost(mqHost);
-	    
-	    createListener();
+		updateWorkerFactory = new UpdateWorkerFactory();
+	    if (!("false".equals((String) this.initArgs.get("autoStart")))){
+	    	createListener();
+	    }
 	    
 	}
 	
+
+	
 	public void createListener(){
-		listener = new QueueListenerThread(coreWrapper, factoryWrapper, updateWorkerFactory, plugin_handler, queue);
+		listener = new QueueListenerThread(coreWrapper, factoryWrapper, updateWorkerFactory, plugin_handler, workerSettings, errorSettings, queue);
 	    listener.setDurable(durable);
-	    listener.setWorkerSettings(workerSettings);
 	    listener.start();
+	    logger.log(Level.INFO, "Listener Started");
+
 	}
 
 	@Override
@@ -110,10 +120,11 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 		rsp.add("tasks", tasks);
 		
 		
-		if (listener == null){
+		if ((listener == null) || (listener.getConnection() == null)){
 			status = "Closed";
 		} else if (status == null){
-			status = listener.getConnection().getStatus();
+			IConnectionWrapper conn = listener.getConnection();
+			status = conn.getStatus();
 			if (status == null){
 				status = "OK";
 			}
@@ -140,8 +151,6 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 			listener.purgeQueue();
 		}
 		return null;
-		
-		
 	}
 	
 	
@@ -154,7 +163,6 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 	 */
 	public void inform(SolrCore core) {
 		coreWrapper.setCore(core);
-		//this.core = core;
 	}
 
 
@@ -168,8 +176,6 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 	public void setCoreWrapper(ISolrCoreWrapper coreWrapper) {
 		this.coreWrapper = coreWrapper;
 	}
-
-
 
 	public IConnectionFactoryWrapper getFactoryWrapper() {
 		return factoryWrapper;

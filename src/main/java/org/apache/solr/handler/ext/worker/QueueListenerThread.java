@@ -3,7 +3,10 @@ package org.apache.solr.handler.ext.worker;
 import java.io.IOException;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.mq.wrapper.ConnectionFactoryWrapper;
 import org.apache.solr.mq.wrapper.IChannelWrapper;
 import org.apache.solr.mq.wrapper.IConnectionFactoryWrapper;
 import org.apache.solr.mq.wrapper.IConnectionWrapper;
@@ -25,8 +28,8 @@ public class QueueListenerThread extends Thread{
 	protected IConnectionFactoryWrapper factory;
 	protected String handler;
 	protected String queue;
-	protected String errorQueue;
-	protected NamedList<String> workerSettings;
+	protected String errorQueue = null;
+	protected NamedList workerSettings;
 
 	protected ISolrCoreWrapper core;
 	protected Boolean durable;
@@ -35,58 +38,80 @@ public class QueueListenerThread extends Thread{
 	private Exception error;
 	private UpdateWorkerFactory updateWorkerFactory;
 	
-	public QueueListenerThread(ISolrCoreWrapper coreWrapper, IConnectionFactoryWrapper factory, UpdateWorkerFactory updateWorkerFactory, String handler, String queue){
+	Logger logger = Logger.getLogger("org.apache.solr.handler.ext.worker.QueueListenerThread");
+	private IChannelWrapper errorChannel;
+	
+	
+	public QueueListenerThread(ISolrCoreWrapper coreWrapper, IConnectionFactoryWrapper factory, UpdateWorkerFactory updateWorkerFactory, String handler, NamedList workerSettings, NamedList errorSettings, String queue){
 		this.core = coreWrapper;
 		this.updateWorkerFactory = updateWorkerFactory;
 		this.factory = factory;
 		this.handler = handler;
 		this.queue = queue;
 		this.durable = Boolean.FALSE;
-		this.errorQueue = null;
+		this.workerSettings = workerSettings;
+		try {
+			//TODO: causes nullpointer Exception 
+			this.errorChannel = buildErrorQueue((NamedList)errorSettings);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 		this.mode = RUNNING;
 	}
 	
 	public void run() {
+
 		for (;;){
 			try {
-				if ("true".equals(workerSettings.get("useAuthentication")) && !StringUtils.isEmpty(workerSettings.get("username")) && !StringUtils.isEmpty(workerSettings.get("password"))){
-					factory.applyAuthentication(workerSettings.get("username"), workerSettings.get("password"));
-				}
-				connection = factory.newConnection();
+				logger.log(Level.INFO, "SolrMQ connection starting");
+				connection = factory.newConnection(workerSettings);
+				logger.log(Level.INFO, "SolrMQ connection started");
 				channel = connection.createChannel();
+				logger.log(Level.INFO, "SolrMQ channel created");
 			    channel.queueDeclare(queue, durable.booleanValue(), false, false, null);
+			    logger.log(Level.INFO, "SolrMQ queue declared ["+queue+"]");
 			    channel.initialiseConsumer(queue);
-			    
+			    logger.log(Level.INFO, "SolrMQ consumer started");
 			    while (true) {
-			      
+			      logger.log(Level.INFO, "SolrMQ consumer listening...");
 			      QueueingConsumer.Delivery delivery = channel.getNextDelivery();
+			      logger.log(Level.INFO, "SolrMQ message recieved ["+delivery.getBody()+"]");
 			      QueueUpdateWorker worker = updateWorkerFactory.getUpdateWorker(this, workerSettings, core, channel, handler, delivery);
-			      String errorQueue = workerSettings.get("errorQueue");
-			      if (errorQueue != null && !errorQueue.isEmpty()){
-			    	  worker.setErrorChannel(buildErrorQueue(errorQueue));
-			      }
+			      logger.log(Level.INFO, "SolrMQ worker started: "+worker.getClass().getName());
+			      
+			      worker.setErrorQueue(errorChannel, errorQueue);
+			      
+			      logger.log(Level.INFO, "SolrMQ worker running update...");
 			      worker.run();
-	//		      worker.start();
+			      logger.log(Level.INFO, "SolrMQ worker update complete.");
 			    }
 			} catch (Exception e) {
+				logger.log(Level.ERROR, "SolrMQ Exception on Listener: "+e.getClass().getName());		
+				logger.log(Level.ERROR, e);				
 				error = e;
 			}
 			if (mode == STOPPED){
+				logger.log(Level.INFO, "SolrMQ worker stopped.");
 				break;
 			}
 			try {
+				logger.log(Level.WARN, "Connection failed, reconnecting in 1 second.");
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
-				e.printStackTrace();
+				logger.log(Level.ERROR, e);	
 			}
 		}
 		
 	}
 
-	protected IChannelWrapper buildErrorQueue(String errorQueue) throws IOException {
-		IConnectionWrapper errorConnection = factory.newConnection();
+	protected IChannelWrapper buildErrorQueue(NamedList errorSettings) throws IOException {
+		if (errorSettings == null) return null;
+		IConnectionFactoryWrapper factory = new ConnectionFactoryWrapper();
+		String queue = (String)errorSettings.get("queue");
+		this.errorQueue = queue;
+		IConnectionWrapper errorConnection = factory.newConnection(errorSettings);
 		IChannelWrapper channel = errorConnection.createChannel();
-		channel.queueDeclare(errorQueue, true, false, false, null);
+		channel.queueDeclare(queue, true, false, false, null);
 		return channel;
 	}
 
@@ -109,7 +134,7 @@ public class QueueListenerThread extends Thread{
 		this.workerSettings = workerSettings;
 	}
 
-	public NamedList<String> getWorkerSettings() {
+	public NamedList getWorkerSettings() {
 		return workerSettings;
 	}
 

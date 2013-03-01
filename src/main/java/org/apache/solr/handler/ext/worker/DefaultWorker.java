@@ -37,22 +37,13 @@ public class DefaultWorker extends QueueUpdateWorker{
 			}
 		}
 		
-//		try {
-//			System.out.println("Basic Ack");
-//			//channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-//			System.out.println("Basic Ack Sent");
-//		} catch (IOException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-		
 	}
 
 	@Override
 	protected void handleError(SolrMqException e,
 			SolrQueryRequest request, SolrQueryResponse response) {
-		String errorQueue = settings.get("errorQueue");
-		if (errorChannel != null && errorQueue != null && !errorQueue.isEmpty()){
+		
+		if (errorChannel != null){
 			try {
 				sendResponse(errorChannel, errorQueue, e.getMessage());
 			} catch (IOException e1) {
