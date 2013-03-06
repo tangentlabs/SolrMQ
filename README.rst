@@ -6,7 +6,7 @@ We use the RabbitMQ library.
 
 It makes use of the current Solr update plugins and allows you to specify the Queue name and Update handler.
 
-You will need to add a new request handler similar to the following.
+You will need to add a new request handler (in your solrconfig) similar to the following.
 
 Sample SolrConfig config:::
 
