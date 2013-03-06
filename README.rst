@@ -8,10 +8,8 @@ It makes use of the current Solr update plugins and allows you to specify the Qu
 
 Sample SolrConfig config:::
 
-<!-- 
-    possibly import 
--->
-	<requestHandler name="/mq" class="org.apache.solr.handler.ext.SolrMessageQueue" >
+
+    <requestHandler name="/mq" class="org.apache.solr.handler.ext.SolrMessageQueue" >
        <str name="messageQueueHost">localhost</str>
        <str name="queue">solrmq</str>
        <str name="updateHandlerName">/update</str>
