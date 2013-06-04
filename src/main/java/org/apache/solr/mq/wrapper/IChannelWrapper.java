@@ -11,12 +11,10 @@ import com.rabbitmq.client.ShutdownSignalException;
 
 public interface IChannelWrapper {
 
-	void queueDeclare(String queue, boolean booleanValue, boolean b, boolean c,
+	QueueStatus queueDeclare(String queue, boolean booleanValue, boolean b, boolean c,
 			Map<String,Object> object) throws IOException;
 
-	void basicConsume(String queue, boolean b, QueueingConsumer consumer);
-
-	void basicPublish(String string, String queue, BasicProperties props,
+	void publish(String string, String queue, BasicProperties props,
 			byte[] bytes);
 
 	void initialiseConsumer(String queue) throws IOException;
@@ -30,5 +28,7 @@ public interface IChannelWrapper {
 	public void purgeQueue() throws IOException;
 	
 	public void deleteQueue() throws IOException;
+
+	QueueStatus queueDeclarePassive(String queue) throws IOException;
 
 }

@@ -2,6 +2,7 @@ package org.apache.solr.handler.ext.worker;
 
 import java.io.IOException;
 
+import org.apache.log4j.Logger;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.handler.ext.exceptions.ResponseFailedException;
 import org.apache.solr.handler.ext.exceptions.SolrMqException;
@@ -16,6 +17,8 @@ import com.rabbitmq.client.QueueingConsumer.Delivery;
 
 public class DefaultWorker extends QueueUpdateWorker{
 
+	
+	Logger logger = Logger.getLogger("org.apache.solr.handler.ext.worker.DefaultWorker");
 	public DefaultWorker(NamedList<String> workerSettings, ISolrCoreWrapper core, IChannelWrapper channel2, String updateHandler,
 			Delivery delivery) {
 		super(workerSettings, core, channel2, updateHandler, delivery);
@@ -42,7 +45,6 @@ public class DefaultWorker extends QueueUpdateWorker{
 	@Override
 	protected void handleError(SolrMqException e,
 			SolrQueryRequest request, SolrQueryResponse response) {
-		
 		if (errorChannel != null){
 			try {
 				sendResponse(errorChannel, errorQueue, e.getMessage());
@@ -51,14 +53,13 @@ public class DefaultWorker extends QueueUpdateWorker{
 				e1.printStackTrace();
 			}
 		}
-		
 	}
 	
 	protected void sendResponse(IChannelWrapper errorChannel, String queue, String message) throws IOException{
 		BasicProperties props = new BasicProperties.Builder()
             .correlationId(delivery.getProperties().getCorrelationId())
             .build();
-		errorChannel.basicPublish( "", queue, props, message.getBytes());
+		errorChannel.publish( "", queue, props, message.getBytes());
 	}
 
 

@@ -19,11 +19,11 @@ public class SolrCoreWrapper implements ISolrCoreWrapper{
 	
 	public void executeSolrUpdateRequest(String handler,
 			SolrQueryRequest request, SolrQueryResponse response) {
-		logger.log(Level.ERROR, "Update "+handler);
+		logger.log(Level.INFO, "Update "+handler);
 		SolrRequestHandler requestHandler = core.getRequestHandler(handler);
-		logger.log(Level.ERROR, "Got Update Handler "+requestHandler.getName());
+		logger.log(Level.INFO, "Got Update Handler "+requestHandler.getName());
 		core.execute(requestHandler, request, response);
-		logger.log(Level.ERROR, "Update Complete");
+		logger.log(Level.INFO, "Update Complete");
 	}
 
 	public SolrCore getCore() {

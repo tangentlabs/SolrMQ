@@ -10,8 +10,10 @@ import org.apache.solr.handler.RequestHandlerBase;
 import org.apache.solr.handler.ext.worker.QueueListenerThread;
 import org.apache.solr.handler.ext.worker.UpdateWorkerFactory;
 import org.apache.solr.mq.wrapper.ConnectionFactoryWrapper;
+import org.apache.solr.mq.wrapper.IChannelWrapper;
 import org.apache.solr.mq.wrapper.IConnectionFactoryWrapper;
 import org.apache.solr.mq.wrapper.IConnectionWrapper;
+import org.apache.solr.mq.wrapper.QueueStatus;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.solrcore.wrapper.ISolrCoreWrapper;
@@ -38,6 +40,7 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 	public SolrMessageQueue() {}
 	
 	Logger logger = Logger.getLogger("org.apache.solr.handler.ext.SolrMessageQueue");
+	private QueueStatus queueStatus;
 	
 	
 	@SuppressWarnings("unchecked")
@@ -117,6 +120,7 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 		tasks.add("reconnect", "<a href='#?task=reconnect'>Restart Consumer</a>");
 		tasks.add("purge", "<a href='#?task=purge'>Purge Queue Contents</a>");
 		tasks.add("delete", "<a href='#?task=delete'>Delete Queue</a>");
+		tasks.add("poll", "<a href='#?task=poll'>Poll for queue statistics</a>");
 		rsp.add("tasks", tasks);
 		
 		
@@ -131,6 +135,10 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 		}
 		rsp.add("status", status);
 		rsp.add("durable", durable.toString());
+		if (queueStatus != null){
+			rsp.add("message_count", "["+queueStatus.getMessageCount()+"]");
+			rsp.add("consumer_count", "["+queueStatus.getConsumerCount()+"]");
+		}
 	}
 
 	private String performTask(SolrQueryResponse rsp, String task) throws Exception {
@@ -149,6 +157,11 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 		}
 		if (task.equalsIgnoreCase("purge")){
 			listener.purgeQueue();
+		}
+		if (task.equalsIgnoreCase("poll")){
+			IConnectionWrapper conn = listener.getConnection();
+			IChannelWrapper chan = conn.createChannel();
+			queueStatus = chan.queueDeclarePassive(queue);
 		}
 		return null;
 	}
