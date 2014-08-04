@@ -8,4 +8,5 @@ public interface IConnectionFactoryWrapper {
 	void setHost(String host);
 	IConnectionWrapper newConnection(NamedList workerSettings) throws IOException;
 	void applyAuthentication(String username, String password);
+	IChannelWrapper getChannel(IConnectionWrapper connection, NamedList workerSettings) throws IOException;
 }

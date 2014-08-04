@@ -21,6 +21,12 @@ Sample SolrConfig config:::
               <str name="username">user</str>
               <str name="password">password</str>
           </lst>
+          <!--
+           <lst name="exchange">
+              <str name="name">search_index</str>
+              <str name="type">fanout</str>
+          </lst>
+          -->
        </lst>
        <lst name="errorQueue">
           <str name="messageQueueHost">localhost</str>

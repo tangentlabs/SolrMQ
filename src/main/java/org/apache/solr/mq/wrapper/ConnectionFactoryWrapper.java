@@ -62,4 +62,17 @@ public class ConnectionFactoryWrapper implements IConnectionFactoryWrapper {
 		}
 	}
 
+
+	public IChannelWrapper getChannel(IConnectionWrapper connection,
+			NamedList workerSettings) throws IOException {
+		IChannelWrapper channel = connection.createChannel();
+		NamedList exchange = (NamedList)workerSettings.get("exchange");
+		if (exchange != null){
+			channel.declareExchange((String)exchange.get("name"), 
+					ExchangeType.fromValue((String)exchange.get("type")));
+		}
+		
+		return channel;
+	}
+
 }

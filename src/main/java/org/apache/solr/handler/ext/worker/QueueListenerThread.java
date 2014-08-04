@@ -2,7 +2,6 @@ package org.apache.solr.handler.ext.worker;
 
 import java.io.IOException;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.solr.common.util.NamedList;
@@ -66,7 +65,9 @@ public class QueueListenerThread extends Thread{
 				logger.log(Level.INFO, "SolrMQ connection starting");
 				connection = factory.newConnection(workerSettings);
 				logger.log(Level.INFO, "SolrMQ connection started");
-				channel = connection.createChannel();
+				//channel = connection.createChannel();
+				channel = factory.getChannel(connection, workerSettings);
+				
 				logger.log(Level.INFO, "SolrMQ channel created");
 			    channel.queueDeclare(queue, durable.booleanValue(), false, false, null);
 			    logger.log(Level.INFO, "SolrMQ queue declared ["+queue+"]");
@@ -76,6 +77,11 @@ public class QueueListenerThread extends Thread{
 			      logger.log(Level.INFO, "SolrMQ consumer listening...");
 			      QueueingConsumer.Delivery delivery = channel.getNextDelivery();
 			      logger.log(Level.INFO, "SolrMQ message recieved ["+delivery.getBody()+"]");
+			      
+			      /**
+			       * TODO: Change this to use an executorService
+			       */
+			      
 			      QueueUpdateWorker worker = updateWorkerFactory.getUpdateWorker(this, workerSettings, core, channel, handler, delivery);
 			      logger.log(Level.INFO, "SolrMQ worker started: "+worker.getClass().getName());
 			      

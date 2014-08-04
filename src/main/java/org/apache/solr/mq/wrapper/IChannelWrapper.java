@@ -31,4 +31,6 @@ public interface IChannelWrapper {
 	
 	public void deleteQueue() throws IOException;
 
+	void declareExchange(String object, ExchangeType object2) throws IOException;
+
 }

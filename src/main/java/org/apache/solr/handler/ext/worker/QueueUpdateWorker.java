@@ -1,16 +1,14 @@
 package org.apache.solr.handler.ext.worker;
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.codec.binary.StringUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-
 import org.apache.solr.common.params.MultiMapSolrParams;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
@@ -69,31 +67,39 @@ public abstract class QueueUpdateWorker extends Thread {
 	 */
 	public void run() {
 		logger.log(Level.ERROR, "handelling Result");
-		String message = new String(delivery.getBody());
-		SolrQueryRequest request = getRequest(getParams(), message);
-		SolrQueryResponse response = getInitialResponse();
-		if (updateHandler.equals("/null")){
-			logger.log(Level.INFO, "SolrMQ NULL Handler ["+delivery.getBody()+"]");
-		}else {
-			performUpdateRequest(updateHandler, request, response);
-			try {
-				handleResult(request, response);
-			} catch (UpdateFailedException e) {
-				logger.log(Level.ERROR, e);
-				handleError(e, request, response);
-			} catch (ResponseFailedException e) {
-				logger.log(Level.ERROR, e);
-				handleError(e, request, response);
+		/**
+		 * DECODE:
+		 */
+		try {
+			String message = StringUtils.newStringUtf8(delivery.getBody());
+	
+			SolrQueryRequest request = getRequest(getParams(), message);
+			SolrQueryResponse response = getInitialResponse();
+			if (updateHandler.equals("/null")){
+				logger.log(Level.INFO, "SolrMQ NULL Handler ["+delivery.getBody()+"]");
+			}else {
+				performUpdateRequest(updateHandler, request, response);
+				try {
+					handleResult(request, response);
+				} catch (UpdateFailedException e) {
+					logger.log(Level.ERROR, e);
+					handleError(e, request, response);
+				} catch (ResponseFailedException e) {
+					logger.log(Level.ERROR, e);
+					handleError(e, request, response);
+				}
 			}
-		}
-		if ("manual".equals(this.settings.get("acknowledge"))){
-			logger.log(Level.INFO, "Sending Ack");
-			try {
-				channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-			} catch (IOException e) {
-				logger.log(Level.ERROR, "SolrMQ Listener error: Sending Ack");
-				logger.log(Level.ERROR, e);
+			if ("manual".equals(this.settings.get("acknowledge"))){
+				logger.log(Level.INFO, "Sending Ack");
+				try {
+					channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+				} catch (IOException e) {
+					logger.log(Level.ERROR, "SolrMQ Listener error: Sending Ack");
+					logger.log(Level.ERROR, e);
+				}
 			}
+		} catch (IllegalStateException ise){
+			handleError(new UpdateFailedException("Non-UTF-8 Content", ise), null, null);
 		}
 	}
 

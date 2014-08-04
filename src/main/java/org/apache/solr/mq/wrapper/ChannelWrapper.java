@@ -74,4 +74,9 @@ public class ChannelWrapper implements IChannelWrapper {
 		
 	}
 
+	public void declareExchange(String name, ExchangeType type) throws IOException {
+		// TODO Auto-generated method stub
+		channel.exchangeDeclare(name, type.toString());
+	}
+
 }

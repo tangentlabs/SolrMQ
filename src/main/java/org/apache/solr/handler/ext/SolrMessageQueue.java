@@ -55,6 +55,8 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 			factoryWrapper = new ConnectionFactoryWrapper(new ConnectionFactory());
 		}
 		factoryWrapper.setHost(mqHost);
+		
+//		factoryWrapper.setExchange()
 		updateWorkerFactory = new UpdateWorkerFactory();
 	    if (!("false".equals((String) this.initArgs.get("autoStart")))){
 	    	createListener();
