@@ -85,11 +85,6 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 	}
 
 	@Override
-	public String getSourceId() {
-		return "$Id$";
-	}
-
-	@Override
 	public String getVersion() {
 		return "$Revision$";
 	}
