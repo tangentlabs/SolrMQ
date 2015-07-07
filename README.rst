@@ -42,8 +42,5 @@ At the moment it is a fire-and-forget standard queue.
 We will add in other queue mechanisms shortly, and add in error
 handeling, such as logging, and error queues.
 
-
-
-
- 
+You can check the develop branch for this.
 
