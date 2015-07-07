@@ -1,57 +1,78 @@
 package org.apache.solr.handler.ext;
 
 import java.io.IOException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
-import org.apache.solr.common.params.MultiMapSolrParams;
-import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.common.util.ContentStream;
-import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.NamedList;
-import org.apache.solr.core.PluginInfo;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.handler.RequestHandlerBase;
+import org.apache.solr.handler.ext.worker.QueueListenerThread;
+import org.apache.solr.handler.ext.worker.UpdateWorkerFactory;
+import org.apache.solr.mq.wrapper.ConnectionFactoryWrapper;
+import org.apache.solr.mq.wrapper.IChannelWrapper;
+import org.apache.solr.mq.wrapper.IConnectionFactoryWrapper;
+import org.apache.solr.mq.wrapper.IConnectionWrapper;
+import org.apache.solr.mq.wrapper.QueueStatus;
 import org.apache.solr.request.SolrQueryRequest;
-import org.apache.solr.request.SolrRequestHandler;
 import org.apache.solr.response.SolrQueryResponse;
+import org.apache.solr.solrcore.wrapper.ISolrCoreWrapper;
 import org.apache.solr.util.plugin.SolrCoreAware;
+import org.apache.solr.solrcore.wrapper.SolrCoreWrapper;
 
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.ConsumerCancelledException;
-import com.rabbitmq.client.QueueingConsumer;
-import com.rabbitmq.client.ShutdownSignalException;
 
-import org.apache.solr.request.SolrQueryRequestBase;
 
 public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAware {
 
 	protected String mqHost;
-	protected ConnectionFactory factory;
+	protected IConnectionFactoryWrapper factoryWrapper;
 	protected String queue;
+	protected String errorQueue;
 	protected String plugin_handler;
 	protected Boolean durable = Boolean.TRUE;
-	protected SolrCore core;
+	protected ISolrCoreWrapper coreWrapper;
+	protected NamedList workerSettings;
+	protected NamedList errorSettings;
+	protected QueueListenerThread listener;
+	protected UpdateWorkerFactory updateWorkerFactory;
 	
 	public SolrMessageQueue() {}
 	
+	Logger logger = Logger.getLogger("org.apache.solr.handler.ext.SolrMessageQueue");
+	private QueueStatus queueStatus;
+	
+	
+	@SuppressWarnings("unchecked")
 	@Override
-	public void init(NamedList args) {
+	public void init(@SuppressWarnings("rawtypes") NamedList args) {
 		super.init(args);
 		mqHost = (String) this.initArgs.get("messageQueueHost");
 		queue = (String) this.initArgs.get("queue");
 		plugin_handler = (String) this.initArgs.get("updateHandlerName");
-		factory = new ConnectionFactory();
-	    factory.setHost(mqHost);
+		workerSettings = (NamedList) this.initArgs.get("workerSettings");
+		errorSettings = (NamedList) this.initArgs.get("errorQueue");
+		if (coreWrapper == null) coreWrapper = new SolrCoreWrapper();
+		if (workerSettings == null) workerSettings = new NamedList();
+		if (factoryWrapper == null){
+			factoryWrapper = new ConnectionFactoryWrapper(new ConnectionFactory());
+		}
+		factoryWrapper.setHost(mqHost);
+		updateWorkerFactory = new UpdateWorkerFactory();
+	    if (!("false".equals((String) this.initArgs.get("autoStart")))){
+	    	createListener();
+	    }
 	    
-	    QueueListener listener = new QueueListener();
+	}
+	
+
+	
+	public void createListener(){
+		listener = new QueueListenerThread(coreWrapper, factoryWrapper, updateWorkerFactory, plugin_handler, workerSettings, errorSettings, queue);
+	    listener.setDurable(durable);
 	    listener.start();
-	    
+	    logger.log(Level.INFO, "Listener Started");
+
 	}
 
 	@Override
@@ -74,120 +95,124 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 		return "$Revision$";
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws IOException  {
+		String status = null;
+		String task = req.getParams().get("task");
+		if (task != null){
+			try {
+				status = performTask(rsp, task);
+			} catch(Exception e){
+				status = "Exception Occurred";
+				rsp.add("task_results", e.getMessage());
+			} 
+		}
 		rsp.add("description", "This is a simple message queueing plugin for solr.");
 		rsp.add("host", mqHost);
 		rsp.add("queue", queue);
 		rsp.add("handler", plugin_handler);
+		
+		@SuppressWarnings("rawtypes")
+		NamedList tasks = new NamedList();
+		tasks.add("stop", "<a href='#?task=stop'>Stop Consumer</a>");
+		tasks.add("start", "<a href='#?task=start'>Start Consumer</a>");
+		tasks.add("reconnect", "<a href='#?task=reconnect'>Restart Consumer</a>");
+		tasks.add("purge", "<a href='#?task=purge'>Purge Queue Contents</a>");
+		tasks.add("delete", "<a href='#?task=delete'>Delete Queue</a>");
+		tasks.add("poll", "<a href='#?task=poll'>Poll for queue statistics</a>");
+		rsp.add("tasks", tasks);
+		
+		
+		if ((listener == null) || (listener.getConnection() == null)){
+			status = "Closed";
+		} else if (status == null){
+			IConnectionWrapper conn = listener.getConnection();
+			status = conn.getStatus();
+			if (status == null){
+				status = "OK";
+			}
+		}
+		rsp.add("status", status);
 		rsp.add("durable", durable.toString());
+		if (queueStatus != null){
+			rsp.add("message_count", "["+queueStatus.getMessageCount()+"]");
+			rsp.add("consumer_count", "["+queueStatus.getConsumerCount()+"]");
+		}
+	}
+
+	private String performTask(SolrQueryResponse rsp, String task) throws Exception {
+		if (task.equalsIgnoreCase("delete")){
+			listener.deleteQueue();
+		}
+		if (task.equalsIgnoreCase("stop") || task.equalsIgnoreCase("restart") || task.equalsIgnoreCase("delete")){
+			listener.requestStop();
+			listener.setMode(listener.STOPPED);
+			listener = null;
+		}
+		if (task.equalsIgnoreCase("start") || task.equalsIgnoreCase("restart")){
+			createListener();
+			listener.setMode(listener.RUNNING);
+			return "starting";
+		}
+		if (task.equalsIgnoreCase("purge")){
+			listener.purgeQueue();
+		}
+		if (task.equalsIgnoreCase("poll")){
+			IConnectionWrapper conn = listener.getConnection();
+			IChannelWrapper chan = conn.createChannel();
+			queueStatus = chan.queueDeclarePassive(queue);
+		}
+		return null;
 	}
 	
-	/**
-	 * Performs the actual update request
-	 * @param handler - name of the handler, like /update or /update/json. Should probably be loaded.
-	 * @param params - the parameters, these can be parsed as custom message headers
-	 * @param message - the actual message, at present only strings are allowed.
-	 * @return SolrQueryResponse - returns the actiual response. Check the Exception to handle faults
-	 */
-	public SolrQueryResponse performUpdateRequest(String handler, Map<String, String[]> params, String message){
-		
-		MultiMapSolrParams solrParams = new MultiMapSolrParams(params);
-		SolrRequestHandler requestHandler = core.getRequestHandler(handler);
-		
-		SolrQueryRequestBase request = new SolrQueryRequestBase(core, solrParams){};
-		
-		ContentStream stream = new ContentStreamBase.StringStream(message);
-		ArrayList<ContentStream> streams = new ArrayList<ContentStream>();
-		streams.add(stream);
-		request.setContentStreams(streams);
-		SolrQueryResponse response = new SolrQueryResponse();
-		
-		core.execute(requestHandler, request, response);
-		return response;
-	}
+	
+
+
 
 	/**
 	 * This gives us a handle to the SolrCore
 	 *  @param core - the SolrCore
 	 */
 	public void inform(SolrCore core) {
-		this.core = core;
+		coreWrapper.setCore(core);
 	}
 
-	/**
-	 * Listener thread. This is the core listener.
-	 * Any message consumed spawns a new thread for handelling. 
-	 *
-	 * @author rnoble
-	 *
-	 */
-	private class QueueListener extends Thread{
-		public void run() {
-			Connection connection;
-			try {
-				connection = factory.newConnection();
-				Channel channel = connection.createChannel();
-			    channel.queueDeclare(queue, durable.booleanValue(), false, false, null);
-			    QueueingConsumer consumer = new QueueingConsumer(channel);
-			    channel.basicConsume(queue, true, consumer);
-			    
-			    while (true) {
-			      QueueingConsumer.Delivery delivery = consumer.nextDelivery();
-			      QueueUpdateWorker worker = new QueueUpdateWorker(delivery);
-			      worker.start();
-			    }
-			} catch (IOException e) {
-				e.printStackTrace();
-			} catch (ShutdownSignalException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (ConsumerCancelledException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			
-		}
+
+
+	public ISolrCoreWrapper getCoreWrapper() {
+		return coreWrapper;
 	}
 
-	/**
-	 * Worker thread. This is spawned for exach message consumed.
-	 * @author rnoble
-	 *
-	 */
-	private class QueueUpdateWorker extends Thread{
-		QueueingConsumer.Delivery delivery;
-		public QueueUpdateWorker(QueueingConsumer.Delivery delivery){
-			super();
-			this.delivery = delivery;
-		}
 
-		public void run() {
-			String message = new String(delivery.getBody());
-			SolrQueryResponse result = performUpdateRequest(plugin_handler, getParams(), message);
-			//TODO: allow for the RPC round trip.
-			//also allow for failures.
-		}
-		
-		/**
-		 * Extract the parameters from the custom headers, if any have been added.
-		 * @return
-		 */
-		private Map<String, String[]> getParams(){
-			Map<String,Object> headers = delivery.getProperties().getHeaders();
-			
-			Map<String, String[]> params = new HashMap<String, String[]>();
-			if (headers != null){
-				Set<String> keys = headers.keySet();
-				for (String key: keys){
-					Object value = headers.get(key);
-					params.put(key, new String[]{value.toString()});
-				}
-			}
-			return params;
-		}
+
+	public void setCoreWrapper(ISolrCoreWrapper coreWrapper) {
+		this.coreWrapper = coreWrapper;
 	}
+
+	public IConnectionFactoryWrapper getFactoryWrapper() {
+		return factoryWrapper;
+	}
+
+
+
+	public void setFactoryWrapper(IConnectionFactoryWrapper factoryWrapper) {
+		this.factoryWrapper = factoryWrapper;
+	}
+
+
+
+	public UpdateWorkerFactory getUpdateWorkerFactory() {
+		return updateWorkerFactory;
+	}
+
+
+
+	public void setUpdateWorkerFactory(UpdateWorkerFactory updateWorkerFactory) {
+		this.updateWorkerFactory = updateWorkerFactory;
+	}
+
+	
+
+	
 }

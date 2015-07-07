@@ -8,11 +8,30 @@ It makes use of the current Solr update plugins and allows you to specify the Qu
 
 Sample SolrConfig config:::
 
+<!-- 
+    possibly import 
+-->
 	<requestHandler name="/mq" class="org.apache.solr.handler.ext.SolrMessageQueue" >
-      	   <str name="messageQueueHost">localhost</str>
-           <str name="queue">solrmq</str>
-	   <str name="updateHandlerName">/update</str>
-	</requestHandler>
+       <str name="messageQueueHost">localhost</str>
+       <str name="queue">solrmq</str>
+       <str name="updateHandlerName">/update</str>
+       <lst name="workerSettings">
+          <!-- <str name="virtualHost">bob</str> -->
+          <lst name="authentication">
+              <str name="username">user</str>
+              <str name="password">password</str>
+          </lst>
+       </lst>
+       <lst name="errorQueue">
+          <str name="messageQueueHost">localhost</str>
+          <str name="queue">solrmq-errors</str>
+           <!-- <str name="virtualHost">bob</str> -->
+          <lst name="authentication">
+              <str name="username">user</str>
+              <str name="password">password</str>
+          </lst>
+       </lst>
+    </requestHandler>
 	
 You will need to put the ./bin/plugin-solr-mq.jar and the ./lib/rabbitmq-client.jar 
 into the solr lib directory, or load it via the solrconfig.xml.
@@ -24,5 +43,4 @@ We will add in other queue mechanisms shortly, and add in error
 handeling, such as logging, and error queues.
 
 You can check the develop branch for this.
- 
 
