@@ -51,6 +51,7 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 		errorSettings = (NamedList) this.initArgs.get("errorQueue");
 		if (coreWrapper == null) coreWrapper = new SolrCoreWrapper();
 		if (workerSettings == null) workerSettings = new NamedList();
+		
 		if (factoryWrapper == null){
 			factoryWrapper = new ConnectionFactoryWrapper(new ConnectionFactory());
 		}
@@ -82,11 +83,6 @@ public class SolrMessageQueue extends RequestHandlerBase implements SolrCoreAwar
 	@Override
 	public String getSource() {
 		return "$Source$";
-	}
-
-	@Override
-	public String getSourceId() {
-		return "$Id$";
 	}
 
 	@Override

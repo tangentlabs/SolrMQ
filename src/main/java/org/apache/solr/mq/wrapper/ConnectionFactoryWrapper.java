@@ -56,12 +56,12 @@ public class ConnectionFactoryWrapper implements IConnectionFactoryWrapper {
 			String password = (String)authentication.get("password");
 			applyAuthentication(username, password);
 		}
-		String vHost = (String)workerSettings.get("virtualHost");
+		//String vHost = (String)workerSettings.get("virtualHost");
+		String vHost = "rabbit_data_vagrant_vhost";
 		if (vHost != null){
 			factory.setVirtualHost(vHost);
 		}
 	}
-
 
 	public IChannelWrapper getChannel(IConnectionWrapper connection,
 			NamedList workerSettings) throws IOException {
