@@ -62,7 +62,6 @@ public class ConnectionFactoryWrapper implements IConnectionFactoryWrapper {
 		}
 	}
 
-
 	public IChannelWrapper getChannel(IConnectionWrapper connection,
 			NamedList workerSettings) throws IOException {
 		IChannelWrapper channel = connection.createChannel();

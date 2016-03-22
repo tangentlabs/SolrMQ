@@ -63,6 +63,9 @@ public class QueueListenerThread extends Thread{
 		for (;;){
 			try {
 				logger.log(Level.INFO, "SolrMQ connection starting");
+//				for (Object setting: workerSettings){
+//					 logger.log(Level.INFO, setting.toString());
+//				}
 				connection = factory.newConnection(workerSettings);
 				logger.log(Level.INFO, "SolrMQ connection started");
 				//channel = connection.createChannel();
