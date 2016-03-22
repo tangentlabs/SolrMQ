@@ -56,8 +56,7 @@ public class ConnectionFactoryWrapper implements IConnectionFactoryWrapper {
 			String password = (String)authentication.get("password");
 			applyAuthentication(username, password);
 		}
-		//String vHost = (String)workerSettings.get("virtualHost");
-		String vHost = "rabbit_data_vagrant_vhost";
+		String vHost = (String)workerSettings.get("virtualHost");
 		if (vHost != null){
 			factory.setVirtualHost(vHost);
 		}
